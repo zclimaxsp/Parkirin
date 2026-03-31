@@ -1,0 +1,25 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: parkirin-transaction-service
+  cassandra:
+    keyspace-name: parkirin_oltp
+    contact-points: localhost
+    port: 9042
+    local-datacenter: datacenter1
+    schema-action: CREATE_IF_NOT_EXISTS
+
+master-service:
+  base-url: http://localhost:8080
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui/index.html
+
+cors:
+  allowed-origins:
+    - http://localhost:3000
+    - http://localhost:5173
