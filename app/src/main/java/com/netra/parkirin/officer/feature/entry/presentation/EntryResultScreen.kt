@@ -1,17 +1,7 @@
 package com.netra.parkirin.officer.feature.entry.presentation
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,55 +9,32 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Print
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.netra.parkirin.officer.core.components.ParkiRinTopBar
-import com.netra.parkirin.officer.core.theme.ParkiRinTheme
-import com.netra.parkirin.officer.core.theme.Primary
-import com.netra.parkirin.officer.core.theme.StatusSuccess
-
-data class EntryResultUi(
-    val sessionNumber: String,
-    val plateNumber: String,
-    val vehicleType: String,
-    val zoneName: String,
-    val streetName: String?,
-    val entryTime: String,
-    val isSubscription: Boolean,
-    val lotteryCode: String?,
-)
+// 🔍 1. IMPORT UTILS JAM YANG SUDAH DIBUAT TADI MEKS:
+import com.netra.parkirin.officer.core.utils.formatUtcToLocalTime
+import com.netra.parkirin.officer.feature.entry.data.EntryViewModel
 
 @Composable
 fun EntryResultScreen(
-    result: EntryResultUi = EntryResultUi(
-        sessionNumber = "TKT-20260330-001",
-        plateNumber = "B 1234 XYZ",
-        vehicleType = "MOTORCYCLE",
-        zoneName = "Zone A – City Center",
-        streetName = "Jl. Sudirman",
-        entryTime = "08:42",
-        isSubscription = false,
-        lotteryCode = null,
-    ),
     onPrintClick: () -> Unit = {},
     onDoneClick: () -> Unit = {},
+    viewModel: EntryViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val result = uiState.result
+
     Scaffold(
         topBar = {
             ParkiRinTopBar(
@@ -80,115 +47,126 @@ fun EntryResultScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Spacer(modifier = Modifier.height(40.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ── Success Icon ─────────────────────────────────────
+            // Success Checkmark Circle (Adaptive background)
             Box(
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(110.dp)
                     .clip(CircleShape)
-                    .background(StatusSuccess.copy(alpha = 0.12f)),
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = StatusSuccess,
-                    modifier = Modifier.size(44.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(64.dp),
                 )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = if (result.isSubscription) "Subscription Entry" else "Entry Recorded",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = StatusSuccess,
-            )
-            Text(
-                text = result.sessionNumber,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // ── Ticket Card ──────────────────────────────────────
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
-            ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-
-                    if (result.isSubscription) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Primary.copy(alpha = 0.1f))
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "SUBSCRIPTION — FREE",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = Primary,
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
-                    TicketRow("Plate", result.plateNumber, bold = true)
-                    TicketDivider()
-                    TicketRow("Vehicle", result.vehicleType.lowercase().replaceFirstChar { it.uppercase() })
-                    TicketDivider()
-                    TicketRow("Zone", result.zoneName)
-                    result.streetName?.let { TicketRow("Street", it) }
-                    TicketDivider()
-                    TicketRow("Entry Time", result.entryTime)
-
-                    if (result.lotteryCode != null) {
-                        TicketDivider()
-                        TicketRow("Lottery Code", result.lotteryCode, highlight = true)
-                    }
-                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ── Actions ──────────────────────────────────────────
-            FilledTonalButton(
+            Text(
+                text = "Entry Recorded",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = result?.sessionNumber ?: "TKT-00000000-000",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Details Card (Adaptive surface color)
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    TicketRow("Plate", result?.plateNumber ?: "-", isBoldValue = true, valueFontSize = 20.sp)
+                    TicketDivider()
+                    TicketRow("Vehicle", result?.vehicleType?.lowercase()?.replaceFirstChar { it.uppercase() } ?: "Motorcycle")
+                    TicketDivider()
+                    TicketRow("Zone", uiState.zoneName ?: "Zone A - City Center")
+                    TicketDivider()
+                    TicketRow("Street", uiState.streetName ?: "Jl. Sudirman")
+                    TicketDivider()
+
+                    // 🔍 2. GANTI STRATEGI SUBSTRING LAMA LU PAKE UTILS KITA MEKS:
+                    TicketRow(
+                        label = "Entry Time",
+                        value = formatUtcToLocalTime(result?.entryTime)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // Print Ticket Button (Secondary style)
+            Button(
                 onClick = onPrintClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Print Ticket", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Default.Print, null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    "Print Ticket",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Done Button (Primary style)
             Button(
-                onClick = onDoneClick,
+                onClick = {
+                    viewModel.clearResult()
+                    onDoneClick()
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
             ) {
-                Text("Done", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(
+                    "Done",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
@@ -197,25 +175,28 @@ fun EntryResultScreen(
 private fun TicketRow(
     label: String,
     value: String,
-    bold: Boolean = false,
-    highlight: Boolean = false,
+    isBoldValue: Boolean = false,
+    valueFontSize: androidx.compose.ui.unit.TextUnit = 16.sp
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
             text = value,
-            style = if (bold) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
-            fontWeight = if (bold || highlight) FontWeight.Bold else FontWeight.Normal,
-            color = if (highlight) Primary else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                fontSize = valueFontSize,
+                fontWeight = if (isBoldValue) FontWeight.ExtraBold else FontWeight.Medium
+            ),
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
@@ -223,15 +204,8 @@ private fun TicketRow(
 @Composable
 private fun TicketDivider() {
     HorizontalDivider(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = Modifier.padding(vertical = 4.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        thickness = 1.dp,
+        modifier = Modifier.padding(vertical = 2.dp),
     )
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun EntryResultPreview() {
-    ParkiRinTheme {
-        EntryResultScreen()
-    }
 }

@@ -1,12 +1,12 @@
 package com.netra.parkirin.officer.core.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -28,8 +28,8 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem(Destinations.DASHBOARD, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(Destinations.SESSIONS, "Sessions", Icons.Filled.History, Icons.Outlined.History),
-    BottomNavItem(Destinations.SETTINGS, "Settings", Icons.Filled.Settings, Icons.Outlined.Settings),
+    BottomNavItem(Destinations.SESSIONS, "Sessions", Icons.Filled.DirectionsCar, Icons.Outlined.DirectionsCar),
+    BottomNavItem(Destinations.HISTORY, "History", Icons.Filled.History, Icons.Outlined.History),
 )
 
 @Composable

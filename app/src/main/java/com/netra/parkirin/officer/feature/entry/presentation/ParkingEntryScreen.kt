@@ -38,6 +38,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,42 +48,65 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import android.util.Base64
 import com.netra.parkirin.officer.core.components.GpsStatus
 import com.netra.parkirin.officer.core.components.GpsStatusBar
 import com.netra.parkirin.officer.core.components.ParkiRinTopBar
-import com.netra.parkirin.officer.core.theme.ParkiRinTheme
 import com.netra.parkirin.officer.core.theme.Primary
 import com.netra.parkirin.officer.core.theme.StatusError
 import com.netra.parkirin.officer.core.theme.StatusSuccess
+import com.netra.parkirin.officer.feature.entry.data.EntryViewModel
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
 
 data class ZoneInfoUi(
+    val zoneId: String,
+    val streetId: String,
     val zoneName: String,
     val streetName: String?,
-    val tariffSummary: String,   // e.g. "Rp 2.000/2jam, +Rp 1.000/jam"
+    val tariffSummary: String,
 )
 
 @Composable
 fun ParkingEntryScreen(
-    gpsStatus: GpsStatus = GpsStatus.READY,
-    gpsAccuracy: Float? = 12f,
-    zoneInfo: ZoneInfoUi? = ZoneInfoUi("Zone A – City Center", "Jl. Sudirman", "Rp 2.000 / 2 jam, +Rp 1.000/jam"),
-    ocrResult: String? = "B 1234 XYZ",
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
     onBackClick: () -> Unit = {},
     onScanClick: () -> Unit = {},
     onPhotoClick: () -> Unit = {},
-    onSubmitClick: (plate: String) -> Unit = {},
+    onSubmitSuccess: () -> Unit = {},
+    viewModel: EntryViewModel = hiltViewModel(),
+    // TODO: ambil dari DashboardViewModel nanti
+    zoneInfo: ZoneInfoUi? = ZoneInfoUi(
+        zoneId = "bc267baa-f306-4670-bccc-f3023cfa06ca",
+        streetId = "c07214ea-85a4-45f3-8261-666c874c62db",
+        zoneName = "Zone A",
+        streetName = "Jalan Sudirman",
+        tariffSummary = "Rp 2.000 / 2 jam"
+    )
 ) {
-    var plate by remember { mutableStateOf(ocrResult ?: "") }
+    val uiState by viewModel.uiState.collectAsState()
     var isManualEdit by remember { mutableStateOf(false) }
 
-    val canSubmit = gpsStatus == GpsStatus.READY && zoneInfo != null && plate.isNotBlank() && !isLoading
+    // Kalau berhasil submit, navigate ke hasil
+    // Buka ParkingEntryScreen.kt, ubah bagian ini:
+    LaunchedEffect(uiState.result) {
+        if (uiState.result != null) {
+            onSubmitSuccess() // Cukup panggil navigasi saja, jangan di-clear dulu gess!
+        }
+    }
+
+    // TODO: ganti dengan userId dari token login
+    val userId = "0ca9d1f2-6baa-46b6-9b1b-55a7b4f0a087"
+
+    val canSubmit = zoneInfo != null &&
+            uiState.plateNumber.isNotBlank() &&
+            !uiState.isLoading
 
     Scaffold(
         topBar = {
@@ -99,43 +124,10 @@ fun ParkingEntryScreen(
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
 
-            // ── GPS Status ───────────────────────────────────────
             item {
-                GpsStatusBar(status = gpsStatus, accuracyMeters = gpsAccuracy)
+                GpsStatusBar(status = GpsStatus.READY, accuracyMeters = 12f)
             }
 
-            // ── GPS blocked warning ──────────────────────────────
-            if (gpsStatus == GpsStatus.FAILED || gpsStatus == GpsStatus.BLOCKED) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = StatusError.copy(alpha = 0.1f)),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = null,
-                                tint = StatusError,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "GPS unavailable. Move to an open area before recording entry.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = StatusError,
-                            )
-                        }
-                    }
-                }
-            }
-
-            // ── Zone Info ────────────────────────────────────────
             item {
                 Card(
                     modifier = Modifier
@@ -166,9 +158,9 @@ fun ParkingEntryScreen(
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                             )
-                            zoneInfo.streetName?.let { street ->
+                            zoneInfo.streetName?.let {
                                 Text(
-                                    text = street,
+                                    text = it,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -179,25 +171,11 @@ fun ParkingEntryScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                        } else {
-                            Text(
-                                text = if (gpsStatus == GpsStatus.ACQUIRING) "Detecting zone..." else "—",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            if (gpsStatus == GpsStatus.ACQUIRING) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(16.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            }
                         }
                     }
                 }
             }
 
-            // ── Plate Scanner ────────────────────────────────────
             item {
                 Card(
                     modifier = Modifier
@@ -214,7 +192,6 @@ fun ParkingEntryScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Camera / OCR button
                         FilledTonalButton(
                             onClick = onScanClick,
                             modifier = Modifier
@@ -222,21 +199,15 @@ fun ParkingEntryScreen(
                                 .height(56.dp),
                             shape = RoundedCornerShape(12.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = null,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Default.CameraAlt, null, Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
                             Text(
-                                text = if (ocrResult != null) "Re-scan Plate" else "Scan Plate (OCR)",
+                                text = if (uiState.plateNumber.isNotBlank()) "Re-scan Plate" else "Scan Plate (OCR)",
                                 style = MaterialTheme.typography.labelLarge,
                             )
                         }
 
-                        // OCR result or manual input
-                        if (ocrResult != null && !isManualEdit) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                        if (uiState.plateNumber.isNotBlank() && !isManualEdit && uiState.photoBase64 != null) {                            Spacer(modifier = Modifier.height(12.dp))
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -246,15 +217,10 @@ fun ParkingEntryScreen(
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = StatusSuccess,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.Default.CheckCircle, null, tint = StatusSuccess, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = ocrResult,
+                                    text = uiState.plateNumber,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.weight(1f),
@@ -263,19 +229,16 @@ fun ParkingEntryScreen(
                                     onClick = { isManualEdit = true },
                                     modifier = Modifier.size(32.dp),
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Edit",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(16.dp),
-                                    )
+                                    Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                                 }
                             }
                         } else {
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedTextField(
-                                value = plate,
-                                onValueChange = { plate = it.uppercase() },
+                                value = uiState.plateNumber,
+                                onValueChange = {
+                                    viewModel.onPlateNumberChanged(it.uppercase())
+                                },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = { Text("Plate Number") },
                                 placeholder = { Text("e.g. B 1234 XYZ") },
@@ -284,6 +247,12 @@ fun ParkingEntryScreen(
                                 keyboardOptions = KeyboardOptions(
                                     capitalization = KeyboardCapitalization.Characters,
                                     keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Done // 1. Munculin tombol centang/Done di keyboard HP
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        isManualEdit = false // 2. Kunci inputan saat tombol centang keyboard diklik
+                                    }
                                 ),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = Primary,
@@ -295,7 +264,6 @@ fun ParkingEntryScreen(
                 }
             }
 
-            // ── Photo (optional) ─────────────────────────────────
             item {
                 Card(
                     modifier = Modifier
@@ -304,40 +272,50 @@ fun ParkingEntryScreen(
                     shape = RoundedCornerShape(12.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Vehicle Photo",
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                            Text(
-                                text = "Optional — tap to capture",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        FilledTonalButton(
-                            onClick = onPhotoClick,
-                            shape = RoundedCornerShape(8.dp),
+                    Column {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text("Take Photo", style = MaterialTheme.typography.labelMedium)
+                            Icon(Icons.Default.PhotoCamera, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Vehicle Photo", style = MaterialTheme.typography.labelLarge)
+                                Text(
+                                    text = if (uiState.photoBase64 != null) "Photo captured ✓" else "Optional — tap to capture",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (uiState.photoBase64 != null) StatusSuccess else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            FilledTonalButton(onClick = onPhotoClick, shape = RoundedCornerShape(8.dp)) {
+                                Text(
+                                    text = if (uiState.photoBase64 != null) "Retake" else "Take Photo",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
+
+                        if (uiState.photoBase64 != null) {
+                            val imageBytes = remember(uiState.photoBase64) {
+                                Base64.decode(uiState.photoBase64, Base64.DEFAULT)
+                            }
+                            AsyncImage(
+                                model = imageBytes,
+                                contentDescription = "Captured vehicle",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
                 }
             }
 
-            // ── Error ────────────────────────────────────────────
-            if (errorMessage != null) {
+            if (uiState.errorMessage != null) {
                 item {
                     Card(
                         modifier = Modifier
@@ -347,7 +325,7 @@ fun ParkingEntryScreen(
                         colors = CardDefaults.cardColors(containerColor = StatusError.copy(alpha = 0.1f)),
                     ) {
                         Text(
-                            text = errorMessage,
+                            text = uiState.errorMessage!!,
                             style = MaterialTheme.typography.bodySmall,
                             color = StatusError,
                             modifier = Modifier.padding(16.dp),
@@ -356,7 +334,6 @@ fun ParkingEntryScreen(
                 }
             }
 
-            // ── Submit ───────────────────────────────────────────
             item {
                 Column(
                     modifier = Modifier
@@ -368,7 +345,20 @@ fun ParkingEntryScreen(
                         modifier = Modifier.padding(bottom = 16.dp),
                     )
                     Button(
-                        onClick = { onSubmitClick(plate) },
+                        onClick = {
+                            zoneInfo?.let { zone ->
+                                viewModel.recordEntry(
+                                    userId = userId,
+                                    zoneId = zone.zoneId,
+                                    zoneName = zone.zoneName,
+                                    streetId = zone.streetId,
+                                    streetName = zone.streetName ?: "",
+                                    lat = 0.0,
+                                    lng = 0.0,
+                                    accuracy = 0f
+                                )
+                            }
+                        },
                         enabled = canSubmit,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -376,7 +366,7 @@ fun ParkingEntryScreen(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Primary),
                     ) {
-                        if (isLoading) {
+                        if (uiState.isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
                                 color = Color.White,
@@ -394,13 +384,5 @@ fun ParkingEntryScreen(
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun ParkingEntryScreenPreview() {
-    ParkiRinTheme {
-        ParkingEntryScreen()
     }
 }

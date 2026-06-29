@@ -32,6 +32,7 @@ android {
             properties.load(localPropertiesFile.inputStream())
         }
         buildConfigField("String", "BASE_URL", "\"${properties.getProperty("BASE_URL", "http://localhost:8080/")}\"")
+        buildConfigField("String", "TRANSACTION_BASE_URL", "\"${properties.getProperty("TRANSACTION_BASE_URL", "http://localhost:8081/")}\"")
         buildConfigField("String", "AUTH_BASE_URL", "\"${properties.getProperty("AUTH_BASE_URL", "http://localhost:9000/")}\"")
         buildConfigField("String", "OAUTH_CLIENT_ID", "\"${properties.getProperty("OAUTH_CLIENT_ID", "parkirin-officer")}\"")
         buildConfigField("String", "OAUTH_REDIRECT_URI", "\"${properties.getProperty("OAUTH_REDIRECT_URI", "com.netra.parkirin.officer://oauth/callback")}\"")
@@ -127,4 +128,7 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    // Location
+    implementation("com.google.android.gms:play-services-location:21.3.0")
 }

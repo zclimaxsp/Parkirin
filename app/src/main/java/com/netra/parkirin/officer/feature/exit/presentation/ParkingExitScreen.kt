@@ -1,5 +1,6 @@
 package com.netra.parkirin.officer.feature.exit.presentation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -31,56 +33,48 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import com.netra.parkirin.officer.core.components.GpsStatus
 import com.netra.parkirin.officer.core.components.GpsStatusBar
 import com.netra.parkirin.officer.core.components.ParkiRinTopBar
-import com.netra.parkirin.officer.core.theme.ParkiRinTheme
 import com.netra.parkirin.officer.core.theme.Primary
 import com.netra.parkirin.officer.core.theme.Secondary
 import com.netra.parkirin.officer.core.theme.StatusError
-
-data class InvoicePreviewUi(
-    val invoiceNumber: String,
-    val plateNumber: String,
-    val zoneName: String,
-    val entryTime: String,
-    val durationMinutes: Int,
-    val amount: Long,
-)
+import com.netra.parkirin.officer.feature.exit.data.ExitViewModel
 
 @Composable
 fun ParkingExitScreen(
-    gpsStatus: GpsStatus = GpsStatus.READY,
-    gpsAccuracy: Float? = 15f,
-    invoicePreview: InvoicePreviewUi? = InvoicePreviewUi(
-        invoiceNumber = "INV-20260330-042",
-        plateNumber = "B 1234 XYZ",
-        zoneName = "Zone A – City Center",
-        entryTime = "08:42",
-        durationMinutes = 87,
-        amount = 5_000L,
-    ),
-    isLoading: Boolean = false,
-    errorMessage: String? = null,
     onBackClick: () -> Unit = {},
     onScanClick: () -> Unit = {},
-    onSearchClick: (plate: String) -> Unit = {},
-    onCashPaymentClick: () -> Unit = {},
-    onQrisPaymentClick: () -> Unit = {},
-    onNotifyAbsentClick: () -> Unit = {},
+    onExitSuccess: (invoiceId: String) -> Unit = {},
+    viewModel: ExitViewModel = hiltViewModel()
 ) {
-    var plate by remember { mutableStateOf("") }
+    val uiState by viewModel.uiState.collectAsState()
+
+    // TODO: ganti dengan userId dari token login
+    val userId = "0ca9d1f2-6baa-46b6-9b1b-55a7b4f0a087"
+
+    // Kalau exit berhasil, navigate ke cash payment
+    LaunchedEffect(uiState.exitResult) {
+        uiState.exitResult?.let { result ->
+            // 🚀 PRIORITAS: Kirim invoiceId sebagai identifier utama! Kalau null baru sessionId.
+            onExitSuccess(result.invoiceId ?: result.sessionId)
+            // ⚠️ JANGAN CLEAR DI SINI! Soalnya butuh data exitResult di CashPaymentScreen gess!
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -98,12 +92,10 @@ fun ParkingExitScreen(
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
 
-            // ── GPS Status ───────────────────────────────────────
             item {
-                GpsStatusBar(status = gpsStatus, accuracyMeters = gpsAccuracy)
+                GpsStatusBar(status = GpsStatus.READY, accuracyMeters = 15f)
             }
 
-            // ── Plate Lookup ─────────────────────────────────────
             item {
                 Card(
                     modifier = Modifier
@@ -139,8 +131,8 @@ fun ParkingExitScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             OutlinedTextField(
-                                value = plate,
-                                onValueChange = { plate = it.uppercase() },
+                                value = uiState.plateNumber,
+                                onValueChange = { viewModel.onPlateNumberChanged(it.uppercase()) },
                                 modifier = Modifier.weight(1f),
                                 label = { Text("Plate Number") },
                                 singleLine = true,
@@ -153,20 +145,24 @@ fun ParkingExitScreen(
                                     focusedLabelColor = Primary,
                                 ),
                             )
+                            // 🌟 GANTI JADI INI MEKS:
                             FilledTonalButton(
-                                onClick = { onSearchClick(plate) },
+                                onClick = { viewModel.searchSession(userId, uiState.plateNumber) }, // 🚀 Oper plateNumber-nya ke sini!
                                 modifier = Modifier.height(56.dp),
                                 shape = RoundedCornerShape(12.dp),
                             ) {
-                                Icon(Icons.Default.Search, null, modifier = Modifier.size(20.dp))
+                                if (uiState.isLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else {
+                                    Icon(Icons.Default.Search, null, modifier = Modifier.size(20.dp))
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // ── Invoice Preview ──────────────────────────────────
-            if (invoicePreview != null) {
+            uiState.session?.let { session ->
                 item {
                     Card(
                         modifier = Modifier
@@ -181,27 +177,30 @@ fun ParkingExitScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Column {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = invoicePreview.plateNumber,
+                                        text = session.platenumber ?: "-",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                     )
                                     Text(
-                                        text = invoicePreview.invoiceNumber,
+                                        text = session.id ?: "-",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        text = "Rp ${"%,d".format(invoicePreview.amount).replace(",", ".")}",
+                                        text = "Rp ${"%,d".format(session.amount).replace(",", ".")}",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = Secondary,
                                     )
                                     Text(
-                                        text = formatDuration(invoicePreview.durationMinutes),
+                                        text = "${session.durationMinutes} min",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
@@ -217,14 +216,13 @@ fun ParkingExitScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                LabeledValue("Zone", invoicePreview.zoneName)
-                                LabeledValue("Entry", invoicePreview.entryTime, align = Alignment.End)
+                                LabeledValue("Zone", session.zoneId, modifier = Modifier.weight(1f))
+                                LabeledValue("Entry", formatToLocalTime(session.entrytime), align = Alignment.End, modifier = Modifier.weight(1f))
                             }
                         }
                     }
                 }
 
-                // ── Payment Actions ──────────────────────────────
                 item {
                     Column(
                         modifier = Modifier
@@ -239,7 +237,7 @@ fun ParkingExitScreen(
                         )
 
                         Button(
-                            onClick = onCashPaymentClick,
+                            onClick = { viewModel.recordExit(userId, "CASH") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -255,7 +253,7 @@ fun ParkingExitScreen(
                         }
 
                         FilledTonalButton(
-                            onClick = onQrisPaymentClick,
+                            onClick = { viewModel.recordExit(userId, "QRIS") },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(52.dp),
@@ -270,7 +268,7 @@ fun ParkingExitScreen(
                         )
 
                         FilledTonalButton(
-                            onClick = onNotifyAbsentClick,
+                            onClick = { viewModel.notifyAbsent(userId) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(48.dp),
@@ -286,8 +284,51 @@ fun ParkingExitScreen(
                 }
             }
 
-            // ── Error ────────────────────────────────────────────
-            if (errorMessage != null) {
+            if (uiState.session == null && uiState.activeSessions.isNotEmpty()) {
+                item {
+                    Text(
+                        text = "Active Sessions in Your Zone",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+                items(uiState.activeSessions) { session ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                            .clickable { viewModel.onSessionSelected(session) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                val displayPlate = if (session.platenumber.isNullOrBlank()) {
+                                    "Session (${session.id?.takeLast(4)?.uppercase() ?: "????"})"
+                                } else {
+                                    session.platenumber
+                                }
+                                Text(displayPlate, fontWeight = FontWeight.Bold)
+                                Text("In: ${formatToLocalTime(session.entrytime)}", style = MaterialTheme.typography.bodySmall)
+                            }
+                            
+                            Spacer(modifier = Modifier.weight(1f)) // 🚀 Dorong harga ke pojok kanan gess!
+
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text("Rp ${"%,d".format(session.amount).replace(",", ".")}", color = Secondary, fontWeight = FontWeight.Bold)
+                                Text("${session.durationMinutes}m", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+
+            uiState.errorMessage?.let { error ->
                 item {
                     Card(
                         modifier = Modifier
@@ -297,7 +338,7 @@ fun ParkingExitScreen(
                         colors = CardDefaults.cardColors(containerColor = StatusError.copy(alpha = 0.1f)),
                     ) {
                         Text(
-                            text = errorMessage,
+                            text = error,
                             style = MaterialTheme.typography.bodySmall,
                             color = StatusError,
                             modifier = Modifier.padding(16.dp),
@@ -312,17 +353,21 @@ fun ParkingExitScreen(
 @Composable
 private fun LabeledValue(
     label: String,
-    value: String,
+    value: String?,
     align: Alignment.Horizontal = Alignment.Start,
+    modifier: Modifier = Modifier,
 ) {
-    Column(horizontalAlignment = align) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = align
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = value,
+            text = value ?: "-",
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
         )
@@ -335,10 +380,14 @@ private fun formatDuration(minutes: Int): String {
     return if (h > 0) "${h}h ${m}m" else "${m}m"
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun ParkingExitPreview() {
-    ParkiRinTheme {
-        ParkingExitScreen()
+private fun formatToLocalTime(entryTimeStr: String?): String {
+    if (entryTimeStr.isNullOrBlank()) return "--:--"
+    return try {
+        val instant = Instant.parse(entryTimeStr)
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(ZoneId.systemDefault())
+        formatter.format(instant)
+    } catch (e: Exception) {
+        entryTimeStr.take(16).replace("T", " ")
     }
 }

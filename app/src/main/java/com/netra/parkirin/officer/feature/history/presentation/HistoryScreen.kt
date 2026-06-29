@@ -1,6 +1,5 @@
-package com.netra.parkirin.officer.feature.sessions.presentation
+package com.netra.parkirin.officer.feature.history.presentation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +16,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.TwoWheeler
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -31,35 +29,37 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.netra.parkirin.officer.core.components.ParkiRinBottomBar
 import com.netra.parkirin.officer.core.components.ParkiRinTopBar
+import com.netra.parkirin.officer.core.navigation.Destinations
 import com.netra.parkirin.officer.core.network.ParkingSessionResponse
 import com.netra.parkirin.officer.core.theme.Primary
 import com.netra.parkirin.officer.core.theme.Secondary
-import com.netra.parkirin.officer.core.components.ParkiRinBottomBar
-import com.netra.parkirin.officer.core.navigation.Destinations
-import com.netra.parkirin.officer.feature.sessions.data.SessionsViewModel
+import com.netra.parkirin.officer.feature.history.data.HistoryViewModel
+import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
-fun ActiveSessionsScreen(
+fun HistoryScreen(
     onNavigate: (String) -> Unit = {},
-    viewModel: SessionsViewModel = hiltViewModel()
+    viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
         topBar = {
             ParkiRinTopBar(
-                title = "Active Sessions",
+                title = "History",
                 actions = {
                     IconButton(onClick = { viewModel.loadData() }) {
                         Icon(
@@ -73,7 +73,7 @@ fun ActiveSessionsScreen(
         },
         bottomBar = {
             ParkiRinBottomBar(
-                currentRoute = Destinations.SESSIONS,
+                currentRoute = Destinations.HISTORY,
                 onNavigate = onNavigate
             )
         }
@@ -87,26 +87,26 @@ fun ActiveSessionsScreen(
                     CircularProgressIndicator()
                 }
             }
-            uiState.sessions.isEmpty() -> {
+            uiState.history.isEmpty() -> {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(innerPadding),
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.Default.DirectionsCar,
+                            imageVector = Icons.Default.History,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(64.dp),
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "No Active Sessions",
+                            text = "No History Found",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Text(
-                            text = "Parked vehicles will appear here",
+                            text = "Completed sessions for today will appear here",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -119,8 +119,8 @@ fun ActiveSessionsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    items(uiState.sessions) { session ->
-                        SessionCard(session = session)
+                    items(uiState.history) { session ->
+                        HistoryCard(session = session)
                     }
                 }
             }
@@ -129,7 +129,13 @@ fun ActiveSessionsScreen(
 }
 
 @Composable
-private fun SessionCard(session: ParkingSessionResponse) {
+private fun HistoryCard(session: ParkingSessionResponse) {
+    val currencyFormatter = remember { 
+        NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID")).apply {
+            maximumFractionDigits = 0
+        }
+    }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -140,31 +146,15 @@ private fun SessionCard(session: ParkingSessionResponse) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = if (session.vehicletype == "CAR") Icons.Default.DirectionsCar else Icons.Default.TwoWheeler,
-                    contentDescription = null,
-                    tint = Primary,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = session.platenumber ?: "Session (${session.id?.takeLast(4)?.uppercase() ?: "????"})",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "In: ${formatToLocalTime(session.entrytime)}",
+                    text = "${formatToLocalTime(session.entrytime)} - ${formatToLocalTime(session.exittime)}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -173,10 +163,10 @@ private fun SessionCard(session: ParkingSessionResponse) {
             Spacer(modifier = Modifier.width(8.dp))
 
             Text(
-                text = "${session.durationMinutes} min",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Secondary,
+                text = currencyFormatter.format(session.totalAmount ?: 0).replace("Rp", "Rp "),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = Primary
             )
         }
     }

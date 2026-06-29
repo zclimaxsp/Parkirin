@@ -1,8 +1,6 @@
 package com.netra.parkirin.officer.feature.exit.presentation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -11,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,6 +29,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,30 +41,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.netra.parkirin.officer.core.components.ParkiRinTopBar
-import com.netra.parkirin.officer.core.theme.ParkiRinTheme
 import com.netra.parkirin.officer.core.theme.Primary
 import com.netra.parkirin.officer.core.theme.Secondary
+import com.netra.parkirin.officer.core.theme.StatusError
 import com.netra.parkirin.officer.core.theme.StatusSuccess
+import com.netra.parkirin.officer.feature.exit.data.ExitViewModel
 
 @Composable
 fun CashPaymentScreen(
-    invoiceNumber: String = "INV-20260330-042",
-    plateNumber: String = "B 1234 XYZ",
-    amount: Long = 5_000L,
-    isLoading: Boolean = false,
+    invoiceId: String = "",
     onBackClick: () -> Unit = {},
-    onConfirmClick: (received: Long) -> Unit = {},
+    onPaymentSuccess: () -> Unit = {},
+    viewModel: ExitViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     var receivedInput by remember { mutableStateOf("") }
     val received by remember { derivedStateOf { receivedInput.toLongOrNull() ?: 0L } }
+    val amount = uiState.exitResult?.amount ?: 0L
     val change by remember { derivedStateOf { (received - amount).coerceAtLeast(0L) } }
     val isValid by remember { derivedStateOf { received >= amount } }
 
-    // Quick-fill presets
+    // TODO: ganti dengan userId dari token login
+    val userId = "0ca9d1f2-6baa-46b6-9b1b-55a7b4f0a087"
+
     val presets = listOf(5_000L, 10_000L, 20_000L, 50_000L)
+
+    // Kalau payment berhasil, navigate ke result
+    LaunchedEffect(uiState.paymentResult) {
+        uiState.paymentResult?.let {
+            onPaymentSuccess()
+            // ⚠️ JANGAN CLEAR DI SINI! Soalnya butuh data paymentResult di ExitResultScreen gess!
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -83,8 +93,6 @@ fun CashPaymentScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp),
         ) {
-
-            // ── Invoice Summary ──────────────────────────────────
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -119,7 +127,7 @@ fun CashPaymentScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "$plateNumber · $invoiceNumber",
+                        text = "${uiState.exitResult?.plateNumber ?: ""} · ${uiState.exitResult?.invoiceId ?: invoiceId}",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.White.copy(alpha = 0.7f),
                     )
@@ -128,7 +136,6 @@ fun CashPaymentScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Cash Received Input ──────────────────────────────
             Text(
                 text = "Amount Received",
                 style = MaterialTheme.typography.labelLarge,
@@ -152,16 +159,13 @@ fun CashPaymentScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ── Quick-fill presets ───────────────────────────────
             Text(
                 text = "Quick Fill",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 presets.forEach { preset ->
                     FilledTonalButton(
                         onClick = { receivedInput = preset.toString() },
@@ -178,7 +182,6 @@ fun CashPaymentScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // ── Change Display ───────────────────────────────────
             if (received > 0) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -211,32 +214,53 @@ fun CashPaymentScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
 
+            uiState.errorMessage?.let { error ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = StatusError.copy(alpha = 0.1f)),
+                ) {
+                    Text(
+                        text = error,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StatusError,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = { onConfirmClick(received) },
-                enabled = isValid && !isLoading,
+                onClick = {
+                    // 🚀 PRIORITAS: Pake invoiceId dulu meks! Biar query backend-nya gak nyangkut di key.id (UUID session)
+                    val finalInvoiceId = uiState.exitResult?.invoiceId 
+                        ?: uiState.exitResult?.sessionId
+                        ?: invoiceId
+
+                    if (finalInvoiceId.isNotEmpty()) {
+                        viewModel.processCashPayment(
+                            userId = userId,
+                            invoiceId = finalInvoiceId,
+                            amountReceived = received
+                        )
+                    }
+                },
+                enabled = isValid && !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Primary),
             ) {
-                if (isLoading) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(22.dp), color = Color.White, strokeWidth = 2.5.dp)
                 } else {
                     Text("Confirm Payment", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun CashPaymentPreview() {
-    ParkiRinTheme {
-        CashPaymentScreen()
     }
 }
