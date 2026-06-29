@@ -30,4 +30,5 @@ data class ParkingSessionDto(
     val status: String,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val totalAmount: Long = 0
 )

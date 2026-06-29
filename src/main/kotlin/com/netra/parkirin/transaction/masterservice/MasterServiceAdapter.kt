@@ -21,7 +21,7 @@ class MasterServiceAdapter(private val masterClient: WebClient) {
         return masterClient.get()
             .uri("/api/v1/vehicles/validate?plate={plate}", plate)
             .retrieve()
-            .onStatus({ it == HttpStatus.NOT_FOUND }) { Mono.empty() }
+            .onStatus({ it == HttpStatus.NOT_FOUND }) { _ -> Mono.error(NoSuchElementException("Not found")) }
             .bodyToMono<VehicleValidateResponse>()
             .onErrorResume { ex ->
                 log.warn("Vehicle validation failed for plate=$plate: ${ex.message}")

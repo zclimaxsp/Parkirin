@@ -11,31 +11,31 @@ data class Invoice(
     @PrimaryKey
     val key: InvoiceKey,
 
-    @Column("invoice_number")
+    @Column("invoicenumber")
     val invoiceNumber: String,
 
-    @Column("session_id")
+    @Column("sessionid")
     val sessionId: UUID,
 
-    @Column("plate_number")
+    @Column("platenumber")
     val plateNumber: String,
 
     val amount: Long = 0L,
 
-    @Column("duration_minutes")
+    @Column("durationminutes")
     val durationMinutes: Int = 0,
 
     val status: String = "UNPAID",
 
-    @Column("expired_at")
+    @Column("expiredat")
     val expiredAt: Instant? = null,
 
-    @Column("qr_token")
+    @Column("qrtoken")
     val qrToken: String? = null,
 
-    @Column("created_at")
+    @Column("createdat")
     val createdAt: Instant = Instant.now(),
 
-    @Column("updated_at")
+    @Column("updatedat")
     val updatedAt: Instant = Instant.now(),
 )

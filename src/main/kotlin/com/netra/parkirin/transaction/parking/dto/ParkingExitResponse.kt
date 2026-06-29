@@ -4,13 +4,13 @@ import java.time.Instant
 import java.util.UUID
 
 data class ParkingExitResponse(
-    val sessionId: UUID,
+    val sessionId: String,
     val sessionNumber: String,
     val plateNumber: String,
-    val invoiceId: UUID,
+    val invoiceId: String, // 🚀 Pastiin ini udah masuk meks!
     val invoiceNumber: String,
     val amount: Long,
     val durationMinutes: Int,
     val qrToken: String,
-    val exitTime: Instant,
+    val exitTime: String
 )

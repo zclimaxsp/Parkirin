@@ -11,68 +11,68 @@ data class ParkingSession(
     @PrimaryKey
     val key: ParkingSessionKey,
 
-    @Column("session_number")
-    val sessionNumber: String,
+    @Column("sessionnumber") // ✅ Sesuai DB: huruf kecil semua
+    val sessionNumber: String? = null,
 
-    @Column("plate_number")
-    val plateNumber: String,
+    @Column("platenumber") // 🚀 FIX UTAMA: Ubah dari "plate_number" jadi "platenumber" gess!
+    val plateNumber: String? = null,
 
-    @Column("vehicle_id")
+    @Column("vehicleid") // ✅ Sesuai DB: huruf kecil semua
     val vehicleId: UUID? = null,
 
-    @Column("vehicle_type")
+    @Column("vehicletype") // ✅ Sesuai DB: huruf kecil semua
     val vehicleType: String? = null,
 
-    @Column("street_id")
+    @Column("streetid") // ✅ Sesuai DB: huruf kecil semua
     val streetId: UUID? = null,
 
-    @Column("street_name")
+    @Column("streetname") // ✅ Sesuai DB: huruf kecil semua
     val streetName: String? = null,
 
-    @Column("entry_officer_id")
+    @Column("entryofficerid") // ✅ Sesuai DB: huruf kecil semua
     val entryOfficerId: UUID? = null,
 
-    @Column("exit_officer_id")
+    @Column("exitofficerid") // ✅ Sesuai DB: huruf kecil semua
     val exitOfficerId: UUID? = null,
 
-    @Column("entry_time")
+    @Column("entrytime") // 🚀 FIX: Ubah dari "entry_time" jadi "entrytime" biar dapet waktu aslinya
     val entryTime: Instant = Instant.now(),
 
-    @Column("exit_time")
+    @Column("exittime") // ✅ Sesuai DB: huruf kecil semua
     val exitTime: Instant? = null,
 
-    @Column("entry_lat")
+    @Column("entrylat") // 🚀 FIX: Ubah jadi huruf kecil semua tanpa underscore gess!
     val entryLat: Double? = null,
 
-    @Column("entry_lng")
+    @Column("entrylng") // ✅ Sesuai DB
     val entryLng: Double? = null,
 
-    @Column("entry_accuracy")
+    @Column("entryaccuracy") // ✅ Sesuai DB
     val entryAccuracy: Float? = null,
 
-    @Column("exit_lat")
+    @Column("exitlat") // ✅ Sesuai DB
     val exitLat: Double? = null,
 
-    @Column("exit_lng")
+    @Column("exitlng") // ✅ Sesuai DB
     val exitLng: Double? = null,
 
-    @Column("exit_accuracy")
+    @Column("exitaccuracy") // ✅ Sesuai DB
     val exitAccuracy: Float? = null,
 
-    @Column("entry_photo_url")
+    @Column("entryphotourl") // 🚀 FIX: dari entry_photo_url jadi entryphotourl
     val entryPhotoUrl: String? = null,
 
-    @Column("exit_photo_url")
+    @Column("exitphotourl") // 🚀 FIX: dari exit_photo_url jadi exitphotourl
     val exitPhotoUrl: String? = null,
 
-    @Column("is_subscription")
+    @Column("issubscription") // 🚀 FIX: dari is_subscription jadi issubscription
     val isSubscription: Boolean = false,
 
     val status: String = "ACTIVE",
 
-    @Column("created_at")
+    @Column("createdat") // 🚀 FIX: dari created_at jadi createdat
     val createdAt: Instant = Instant.now(),
 
-    @Column("updated_at")
+    @Column("updatedat") // 🚀 FIX: dari updated_at jadi updatedat
     val updatedAt: Instant = Instant.now(),
 )

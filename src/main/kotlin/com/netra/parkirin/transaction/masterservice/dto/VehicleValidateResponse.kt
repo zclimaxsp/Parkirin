@@ -1,12 +1,17 @@
 package com.netra.parkirin.transaction.masterservice.dto
 
 import java.util.UUID
+import com.fasterxml.jackson.annotation.JsonProperty
 
 data class VehicleValidateResponse(
+    @JsonProperty("vehicleId")
     val id: UUID,
-    val plateNumber: String,
     val vehicleType: String?,
-    val ownerName: String?,
-    val ownerPhone: String?,
-    val ownerUserId: UUID?,
+    @JsonProperty("isSubscriptionActive")
+    val isSubscriptionActive: Boolean = false,
+    val subscriptionZoneId: UUID? = null,
+    val plateNumber: String? = null,
+    val ownerName: String? = null,
+    val ownerPhone: String? = null,
+    val ownerUserId: UUID? = null,
 )

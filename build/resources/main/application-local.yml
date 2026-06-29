@@ -4,12 +4,20 @@ server:
 spring:
   application:
     name: parkirin-transaction-service
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/parkirin-master-db
+    username: postgres
+    password: postgres
   cassandra:
     keyspace-name: parkirin_oltp
     contact-points: localhost
     port: 9042
     local-datacenter: datacenter1
     schema-action: CREATE_IF_NOT_EXISTS
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
 master-service:
   base-url: http://localhost:8080
@@ -23,3 +31,9 @@ cors:
   allowed-origins:
     - http://localhost:3000
     - http://localhost:5173
+
+minio:
+  endpoint: http://localhost:9090
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: parkirin

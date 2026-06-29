@@ -12,8 +12,8 @@ object LotteryMapper {
             plateNumber = entry.plateNumber,
             zoneId = entry.zoneId,
             code = entry.code,
-            isWinner = entry.isWinner,
-            createdAt = entry.createdAt,
+            isWinner = false,
+            createdAt = java.time.Instant.now(),
         )
     }
 }

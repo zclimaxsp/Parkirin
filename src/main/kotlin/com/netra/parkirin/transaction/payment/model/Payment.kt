@@ -6,27 +6,29 @@ import org.springframework.data.cassandra.core.mapping.Table
 import java.time.Instant
 import java.util.UUID
 
+// Kolom asli di DB lokal (DESCRIBE TABLE parkirin_oltp.payments):
+// zone_id, payment_date, id, amount, createdat, invoiceid, "method", paidat, receiptnumber
+// TIDAK ADA kolom gateway_ref / gatewayref sama sekali, jadi field itu dihapus
+// dari model biar ga ada mismatch pas insert.
 @Table("payments")
 data class Payment(
     @PrimaryKey
     val key: PaymentKey,
 
-    @Column("invoice_id")
+    @Column("invoiceid")
     val invoiceId: UUID,
 
+    @Column("method")
     val method: String = "CASH",
 
     val amount: Long = 0L,
 
-    @Column("receipt_number")
+    @Column("receiptnumber")
     val receiptNumber: String,
 
-    @Column("gateway_ref")
-    val gatewayRef: String? = null,
-
-    @Column("paid_at")
+    @Column("paidat")
     val paidAt: Instant = Instant.now(),
 
-    @Column("created_at")
+    @Column("createdat")
     val createdAt: Instant = Instant.now(),
 )

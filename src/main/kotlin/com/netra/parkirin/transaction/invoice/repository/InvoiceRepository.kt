@@ -13,6 +13,9 @@ interface InvoiceRepository : ReactiveCassandraRepository<Invoice, InvoiceKey> {
     @Query("SELECT * FROM invoices WHERE qr_token = ?0 ALLOW FILTERING")
     fun findByQrToken(qrToken: String): Mono<Invoice>
 
-    @Query("SELECT * FROM invoices WHERE session_id = ?0 ALLOW FILTERING")
+    @Query("SELECT * FROM invoices WHERE sessionid = ?0 ALLOW FILTERING")
     fun findBySessionId(sessionId: UUID): Flux<Invoice>
+
+    @Query("SELECT * FROM invoices WHERE id = ? ALLOW FILTERING")
+    fun findByInvoiceId(id: UUID): Mono<Invoice>
 }

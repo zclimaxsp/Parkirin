@@ -33,6 +33,7 @@ import java.time.temporal.ChronoUnit
 import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.min
+import com.netra.parkirin.transaction.parking.dto.ParkingSummaryResponse
 
 @Service
 class ParkingService(
@@ -47,7 +48,6 @@ class ParkingService(
     fun parkingEntry(request: ParkingEntryRequest, officerId: UUID): Mono<ParkingEntryResponse> {
         val zoneId = request.zoneId
 
-        // Step 1: Validate vehicle, auto-register if not found
         val vehicleMono = masterServiceAdapter.validateVehicle(request.plateNumber)
             .switchIfEmpty {
                 log.info("Vehicle not found, auto-registering plate=${request.plateNumber}")
@@ -65,7 +65,6 @@ class ParkingService(
             }
 
         return vehicleMono.flatMap { vehicle ->
-            // Step 2: Check subscription
             masterServiceAdapter.checkSubscription(vehicle.id, zoneId).flatMap { subscriptionCheck ->
                 val isSubscription = subscriptionCheck.hasActiveSubscription
                 val sessionNumber = generateSessionNumber()
@@ -101,7 +100,6 @@ class ParkingService(
 
                 parkingSessionRepository.save(session).flatMap { savedSession ->
                     if (isSubscription) {
-                        // Insert invoice (amount=0, PAID), payment (SUBSCRIPTION), lottery
                         val invoiceId = UUID.randomUUID()
                         val invoiceKey = InvoiceKey(zoneId = zoneId, invoiceDate = sessionDate, id = invoiceId)
                         val invoice = Invoice(
@@ -173,16 +171,13 @@ class ParkingService(
     }
 
     fun parkingExit(request: ParkingExitRequest, officerId: UUID): Mono<ParkingExitResponse> {
-        // Find active session by plate number
         return parkingSessionRepository.findActiveByPlateNumber(request.plateNumber)
-            .next()
             .switchIfEmpty(Mono.error(NoSuchElementException("No active parking session for plate: ${request.plateNumber}")))
             .flatMap { session ->
                 val now = Instant.now()
                 val durationMinutes = ChronoUnit.MINUTES.between(session.entryTime, now).toInt().coerceAtLeast(1)
                 val zoneId = session.key.zoneId
 
-                // Fetch tariff rules
                 masterServiceAdapter.getTariffRules(zoneId).flatMap { tariffRules ->
                     val vehicleType = session.vehicleType ?: "MOTORCYCLE"
                     val tariff = tariffRules.find { it.vehicleType == vehicleType }
@@ -198,7 +193,6 @@ class ParkingService(
 
                     val amount = calculateAmount(tariff, durationMinutes)
 
-                    // Update session
                     val updatedSession = session.copy(
                         status = "PENDING_PAYMENT",
                         exitOfficerId = officerId,
@@ -221,7 +215,7 @@ class ParkingService(
                             key = invoiceKey,
                             invoiceNumber = invoiceNumber,
                             sessionId = session.key.id,
-                            plateNumber = session.plateNumber,
+                            plateNumber = session.plateNumber ?: "",
                             amount = amount,
                             durationMinutes = durationMinutes,
                             status = "UNPAID",
@@ -231,17 +225,20 @@ class ParkingService(
                             updatedAt = now,
                         )
 
-                        invoiceRepository.save(invoice).map { savedInvoice ->
-                            ParkingExitResponse(
-                                sessionId = session.key.id,
-                                sessionNumber = session.sessionNumber,
-                                plateNumber = session.plateNumber,
-                                invoiceId = invoiceId,
-                                invoiceNumber = invoiceNumber,
-                                amount = amount,
-                                durationMinutes = durationMinutes,
-                                qrToken = qrToken,
-                                exitTime = now,
+                        // GANTI BLOK AKHIR INI DI PARKINGSERVICE.KT LU MEKS!
+                        invoiceRepository.save(invoice).flatMap { savedInvoice ->
+                            Mono.just(
+                                ParkingExitResponse(
+                                    sessionId = session.key.id.toString(),
+                                    sessionNumber = session.sessionNumber ?: "",
+                                    plateNumber = session.plateNumber ?: "",
+                                    invoiceId = savedInvoice.key.id.toString(),
+                                    invoiceNumber = savedInvoice.invoiceNumber,  // Hapus elvis operator ?: bawa petaka
+                                    amount = savedInvoice.amount,                // Hapus elvis operator ?: bawa petaka
+                                    durationMinutes = savedInvoice.durationMinutes, // Hapus elvis operator ?: bawa petaka
+                                    qrToken = savedInvoice.qrToken ?: qrToken,              // Hapus elvis operator ?: bawa petaka
+                                    exitTime = now.toString()
+                                )
                             )
                         }
                     }
@@ -249,9 +246,27 @@ class ParkingService(
             }
     }
 
-    fun listSessions(zoneId: UUID, date: LocalDate): Flux<ParkingSessionDto> {
-        return parkingSessionRepository.findByKeyZoneIdAndKeySessionDate(zoneId, date)
-            .map { ParkingSessionMapper.toDto(it) }
+    fun listSessions(zoneId: UUID, date: LocalDate) : Flux<ParkingSessionDto> {
+        return parkingSessionRepository
+            .findByKeyZoneIdAndKeySessionDate(zoneId, date)
+            .flatMap { session ->
+
+                invoiceRepository
+                    .findBySessionId(session.key.id)
+                    .next()
+                    .map { invoice ->
+
+                        ParkingSessionMapper
+                            .toDto(session)
+                            .copy(totalAmount = invoice.amount)
+
+                    }
+                    .defaultIfEmpty(
+                        ParkingSessionMapper
+                            .toDto(session)
+                            .copy(totalAmount = 0)
+                    )
+            }
     }
 
     fun getSessionById(zoneId: UUID, sessionDate: LocalDate, id: UUID): Mono<ParkingSessionDto> {
@@ -286,4 +301,55 @@ class ParkingService(
 
     private fun currentLotteryPeriod(): String =
         YearMonth.now().toString()
+
+    fun getSummaryToday(zoneId: UUID): Mono<ParkingSummaryResponse> {
+
+        val today = LocalDate.now()
+
+        val sessionsMono =
+            parkingSessionRepository
+                .findByKeyZoneIdAndKeySessionDate(zoneId, today)
+                .collectList()
+
+        val revenueMono =
+            paymentRepository
+                .findByZoneIdAndPaymentDate(zoneId, today)
+                .map { it.amount ?: 0L }
+                .reduce(0L, Long::plus)
+                .defaultIfEmpty(0L)
+
+        return Mono.zip(
+            sessionsMono,
+            revenueMono
+        ).map { tuple ->
+
+            val sessions = tuple.t1
+            val revenue = tuple.t2
+
+            val active =
+                sessions.count {
+                    it.status == "ACTIVE"
+                }
+
+            val avgDuration =
+                sessions.mapNotNull {
+                    it.exitTime?.let { exit ->
+                        ChronoUnit.MINUTES
+                            .between(it.entryTime, exit)
+                            .toInt()
+                    }
+                }
+                    .let {
+                        if (it.isEmpty()) 0
+                        else it.average().toInt()
+                    }
+
+            ParkingSummaryResponse(
+                totalSessions = sessions.size,
+                activeSessions = active,
+                totalRevenue = revenue,
+                avgDurationMinutes = avgDuration
+            )
+        }
+    }
 }

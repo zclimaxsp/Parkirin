@@ -20,6 +20,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import java.time.LocalDate
 import java.util.UUID
+import com.netra.parkirin.transaction.parking.dto.ParkingSummaryResponse
 
 @RestController
 @RequestMapping("/api/v1/parking")
@@ -62,6 +63,31 @@ class ParkingController(private val parkingService: ParkingService) {
     ): Mono<ResponseEntity<ParkingSessionDto>> {
         val sessionDate = date ?: LocalDate.now()
         return parkingService.getSessionById(zoneId, sessionDate, id)
+            .map { ResponseEntity.ok(it) }
+    }
+
+    @GetMapping("/sessions/active")
+    fun listActiveSessions(
+        @RequestParam zoneId: UUID,
+    ): Flux<ParkingSessionDto> {
+        return parkingService.listSessions(zoneId, LocalDate.now())
+            .filter { it.status.uppercase() == "ACTIVE" }
+    }
+
+    @GetMapping("/history/today")
+    fun listHistoryToday(
+        @RequestParam zoneId: UUID,
+    ): Flux<ParkingSessionDto> {
+        return parkingService.listSessions(zoneId, LocalDate.now())
+            .filter { it.status.uppercase() != "ACTIVE" }
+    }
+
+    @GetMapping("/summary/today")
+    fun getSummaryToday(
+        @RequestParam zoneId: UUID,
+        exchange: ServerWebExchange,
+    ): Mono<ResponseEntity<ParkingSummaryResponse>> {
+        return parkingService.getSummaryToday(zoneId)
             .map { ResponseEntity.ok(it) }
     }
 }

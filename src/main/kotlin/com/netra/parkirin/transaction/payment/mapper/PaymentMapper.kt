@@ -13,7 +13,7 @@ object PaymentMapper {
             method = payment.method,
             amount = payment.amount,
             receiptNumber = payment.receiptNumber,
-            gatewayRef = payment.gatewayRef,
+            gatewayRef = null,
             paidAt = payment.paidAt,
             createdAt = payment.createdAt,
         )
